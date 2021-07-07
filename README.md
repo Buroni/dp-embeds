@@ -1,8 +1,9 @@
 # dp-embeds
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+1. Clone this repo and run `npm i && npm start`
+2. Run the `dp_script.py` below to generate reports for the embeds:
 
-**Run the following `dp_script.py` to generate the reports for the embeds**
+## dp_script.py
 
 ```python
 import altair as alt  # noqa
