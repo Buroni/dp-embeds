@@ -1,70 +1,156 @@
-# Getting Started with Create React App
+# dp-embeds
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Available Scripts
+**Run the following `dp_script.py` to generate the reports for the embeds**
 
-In the project directory, you can run:
+```python
+import altair as alt  # noqa
+import matplotlib.pyplot as plt  # noqa
+import plotly.graph_objects as go  # noqa
+from bokeh.plotting import figure  # noqa
+import folium  # noqa
+import pandas as pd
+from vega_datasets import data as vega_data
+import random
+import datapane as dp
+import numpy as np
+import plotly.express as px
+from bokeh.sampledata.iris import flowers
 
-### `npm start`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+def gen_table_df(rows: int = 4, alphabet: str = "ABCDEF") -> pd.DataFrame:
+    data = [{x: random.randint(0, 1000) for x in alphabet} for _ in range(0, rows)]
+    return pd.DataFrame.from_dict(data)
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
 
-### `npm test`
+def gen_df(dim: int = 4) -> pd.DataFrame:
+    axis = [i for i in range(0, dim)]
+    data = {"x": axis, "y": axis}
+    return pd.DataFrame.from_dict(data)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `npm run build`
+def gen_bokeh(responsive=True, **kw):
+    # Create scatter plot with Bokeh
+    colormap = {'setosa': 'red', 'versicolor': 'green', 'virginica': 'blue'}
+    colors = [colormap[x] for x in flowers['species']]
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+    bokeh_chart = figure(title="Iris Morphology", width=1500, height=1500, **kw)
+    bokeh_chart.xaxis.axis_label = 'Petal Length'
+    bokeh_chart.yaxis.axis_label = 'Petal Width'
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+    bokeh_chart.circle(flowers["petal_length"], flowers["petal_width"],
+                       color=colors, fill_alpha=0.2, size=10)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+    # Publish the report
+    return dp.Plot(bokeh_chart, responsive=responsive)
 
-### `npm run eject`
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+def gen_plotly(responsive=True, **kw):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[0, 1, 2, 3, 4, 5], y=[1.5, 1, 1.3, 0.7, 0.8, 0.9]))
+    fig.add_trace(go.Bar(x=[0, 1, 2, 3, 4, 5], y=[1, 0.5, 0.7, -1.2, 0.3, 0.4]))
+    fig.update_layout(**kw)
+    return dp.Plot(fig, responsive=responsive)
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+def gen_plotly_express(responsive=True, **kw):
+    df = px.data.gapminder()
+    plotly_chart = px.scatter(
+        df.query("year==2007"), x="gdpPercap", y="lifeExp",
+        size="pop", color="continent",
+        hover_name="country", log_x=True, size_max=60,
+        width=1500, height=1500,
+        **kw
+    )
+    return dp.Plot(plotly_chart, responsive=responsive)
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
 
-## Learn More
+def gen_vega(responsive=True, **kw):
+    return dp.Plot(
+        data=alt.Chart(gen_df()).properties(width=1500, height=1500, **kw).mark_line().encode(x="x", y="y"),
+        responsive=responsive
+    )
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+def gen_vega_bindings():
+    gap = pd.read_json(vega_data.gapminder.url)
+    select_year = alt.selection_single(
+        name='select', fields=['year'], init={'year': 1955},
+        bind=alt.binding_range(min=1955, max=2005, step=5)
+    )
+    alt_chart = alt.Chart(gap).mark_point(filled=True).encode(
+        alt.X('fertility', scale=alt.Scale(zero=False)),
+        alt.Y('life_expect', scale=alt.Scale(zero=False)),
+        alt.Size('pop:Q'),
+        alt.Color('cluster:N'),
+        alt.Order('pop:Q', sort='descending'),
+    ).add_selection(select_year).transform_filter(select_year)
+    return alt_chart
 
-### Code Splitting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+def gen_matplotlib(responsive=True):
+    gap = pd.read_json(vega_data.gapminder.url)
+    fig = gap.plot.scatter(x='life_expect', y='fertility')
+    return dp.Plot(fig, responsive=responsive)
 
-### Analyzing the Bundle Size
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+def gen_folium():
+    return dp.Plot(folium.Map(location=[45.372, -121.6972], zoom_start=12, tiles="Stamen Terrain"))
 
-### Making a Progressive Web App
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+def gen_plotly_bindings(responsive=True):
+    # Create figure
+    fig = go.Figure()
 
-### Advanced Configuration
+    # Add traces, one for each slider step
+    for step in np.arange(0, 5, 0.1):
+        fig.add_trace(
+            go.Scatter(
+                visible=False,
+                line=dict(color="#00CED1", width=6),
+                name="𝜈 = " + str(step),
+                x=np.arange(0, 10, 0.01),
+                y=np.sin(step * np.arange(0, 10, 0.01))))
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+    # Make 10th trace visible
+    fig.data[10].visible = True
 
-### Deployment
+    # Create and add slider
+    steps = []
+    for i in range(len(fig.data)):
+        step = dict(
+            method="update",
+            args=[{"visible": [False] * len(fig.data)},
+                  {"title": "Slider switched to step: " + str(i)}],  # layout attribute
+        )
+        step["args"][0]["visible"][i] = True  # Toggle i'th trace to "visible"
+        steps.append(step)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+    sliders = [dict(
+        active=10,
+        currentvalue={"prefix": "Frequency: "},
+        pad={"t": 50},
+        steps=steps
+    )]
 
-### `npm run build` fails to minify
+    fig.update_layout(
+        sliders=sliders
+    )
+    return dp.Plot(fig, responsive=responsive)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+dp.Report(gen_vega(responsive=False)).publish(name="vega-report-unresponsive")
+dp.Report(gen_vega()).publish(name="vega-report-responsive")
+dp.Report(gen_vega_bindings()).publish(name="vega-report-bindings")
+dp.Report(gen_plotly_express(responsive=False)).publish(name="plotly-report-unresponsive")
+dp.Report(gen_plotly_express()).publish(name="plotly-report-responsive")
+dp.Report(gen_plotly_bindings()).publish(name="plotly-report-bindings")
+dp.Report(gen_matplotlib()).publish(name="mpl-report-responsive")
+dp.Report(gen_matplotlib(responsive=False)).publish(name="mpl-report-unresponsive")
+dp.Report(gen_bokeh(responsive=False)).publish(name="bokeh-report-unresponsive")
+dp.Report(gen_bokeh()).publish(name="bokeh-report-responsive")
+dp.Report(gen_table_df(rows=40)).publish(name="table-report")
+dp.Report(dp.DataTable(gen_df(1000))).publish(name="datatable-report")
+dp.Report(gen_folium()).publish(name="folium-report")
+dp.Report(gen_vega_bindings(), gen_bokeh(), gen_plotly_express(), gen_matplotlib(), gen_folium()).publish(name="multi-report-responsive")
+```
